@@ -1,0 +1,10 @@
+{
+  "name": "@xmagic/ngx-wujie",
+  "version": "1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/m310851010/ngx-wujie.git"
+  },
+  "author": "m310851010",
+  "license": "MIT"
+}

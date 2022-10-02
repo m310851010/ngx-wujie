@@ -4,16 +4,17 @@ import {
   EventEmitter,
   Input,
   OnChanges,
-  OnDestroy,
   OnInit,
   Output,
   SimpleChange,
   SimpleChanges
 } from '@angular/core';
 import { bus, preloadApp, startApp as rawStartApp, destroyApp, setupApp, plugin } from 'wujie';
+import Wujie from 'wujie/esm/sandbox';
 
 /**
  * 无界微前端angular组件封装
+ * 应用默认带有缓存功能，销毁需要手动调用destroy方法
  */
 @Component({
   selector: 'ngx-wujie',
@@ -23,7 +24,7 @@ import { bus, preloadApp, startApp as rawStartApp, destroyApp, setupApp, plugin 
     '[style.height]': 'height'
   }
 })
-export class WujieComponent implements OnInit, OnChanges, OnDestroy {
+export class WujieComponent implements OnInit, OnChanges {
   /**
    * event bus
    */
@@ -122,11 +123,21 @@ export class WujieComponent implements OnInit, OnChanges, OnDestroy {
    */
   @Input() height?: string;
 
+  startAppQueue: Promise<Function | void> = Promise.resolve();
+
   private get _loading() {
     return (this.loading as ElementRef)?.nativeElement || this.loading;
   }
 
-  startAppQueue: Promise<Function | void> = Promise.resolve();
+  /**
+   * 监听事件
+   * @param event
+   * @param args
+   */
+  private handleEmit = (event: string, ...args: Array<any>): any => {
+    this.events.emit({ event, args });
+  };
+
   constructor(private wujieElementRef: ElementRef) {}
 
   ngOnInit(): void {
@@ -136,6 +147,7 @@ export class WujieComponent implements OnInit, OnChanges, OnDestroy {
 
   private startApp() {
     return rawStartApp({
+      ...this.getWujieLifecycles(),
       name: this.name,
       url: this.url,
       el: this.wujieElementRef.nativeElement,
@@ -149,25 +161,43 @@ export class WujieComponent implements OnInit, OnChanges, OnDestroy {
       prefix: this.prefix,
       fiber: this.fiber,
       degrade: this.degrade,
-      plugins: this.plugins,
-      beforeLoad: appWindow => this.beforeLoad.emit(appWindow),
-      beforeMount: appWindow => this.beforeMount.emit(appWindow),
-      afterMount: appWindow => this.afterMount.emit(appWindow),
-      beforeUnmount: appWindow => this.beforeUnmount.emit(appWindow),
-      afterUnmount: appWindow => this.afterUnmount.emit(appWindow),
-      activated: appWindow => this.activated.emit(appWindow),
-      deactivated: appWindow => this.deactivated.emit(appWindow),
-      loadError: (url, err) => this.loadError.emit({ url, err })
+      plugins: this.plugins
     });
   }
 
   /**
-   * 监听事件
-   * @param event
-   * @param args
+   * 绑定wujie生命周期函数,转化为angular事件
+   * 延迟绑定函数, 可以缓存中配置的生命周期覆盖组件中的生命周期函数
+   * @private
    */
-  private handleEmit(event: string, ...args: Array<any>): any {
-    this.events.emit({ event, args });
+  private getWujieLifecycles(): WujieLifecycles {
+    const lifecycles: WujieLifecycles = {} as WujieLifecycles;
+    if (this.beforeLoad.observed) {
+      lifecycles.beforeLoad = win => this.beforeLoad.emit(win);
+    }
+    if (this.beforeMount.observed) {
+      lifecycles.beforeMount = win => this.beforeMount.emit(win);
+    }
+    if (this.afterMount.observed) {
+      lifecycles.afterMount = win => this.afterMount.emit(win);
+    }
+    if (this.beforeUnmount.observed) {
+      lifecycles.beforeUnmount = win => this.beforeUnmount.emit(win);
+    }
+    if (this.afterUnmount.observed) {
+      lifecycles.afterUnmount = win => this.afterUnmount.emit(win);
+    }
+    if (this.activated.observed) {
+      lifecycles.activated = win => this.activated.emit(win);
+    }
+    if (this.deactivated.observed) {
+      lifecycles.deactivated = win => this.deactivated.emit(win);
+    }
+    if (this.loadError.observed) {
+      lifecycles.loadError = (url, err) => this.loadError.emit({ url, err });
+    }
+
+    return lifecycles;
   }
 
   private execStartApp() {
@@ -180,8 +210,16 @@ export class WujieComponent implements OnInit, OnChanges, OnDestroy {
     }
   }
 
-  ngOnDestroy(): void {
-    destroyApp(this.name);
+  /**
+   * 销毁应用并清空缓存和取消事件
+   */
+  destroy(): void {
     bus.$offAll(this.handleEmit);
+    destroyApp(this.name);
   }
 }
+
+/**
+ * wujie生命周期属性
+ */
+export type WujieLifecycles = Partial<Wujie['lifecycles']>;

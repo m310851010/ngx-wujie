@@ -1,10 +1,13 @@
 {
   "name": "@xmagic/ngx-wujie",
-  "version": "1.0.0",
+  "version": "1.0.0-rc.20",
   "repository": {
     "type": "git",
     "url": "https://github.com/m310851010/ngx-wujie.git"
   },
   "author": "m310851010",
+  "publishConfig": {
+    "access": "public"
+  },
   "license": "MIT"
 }
